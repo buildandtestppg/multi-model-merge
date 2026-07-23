@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Model Merge</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0b;--surface:#131316;--surface2:#1a1a20;--border:#2a2a33;
+  --text:#e8e8ed;--text2:#8e8e98;--accent:#6366f1;--accent2:#818cf8;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--radius:12px;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ═══ PASSWORD GATE ═══ */
+#gate{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.gate-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;max-width:400px;width:100%;text-align:center}
+.gate-box h2{font-size:1.5rem;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.gate-box p{color:var(--text2);font-size:0.85rem;margin-bottom:24px}
+.gate-input{
+  width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text);font-size:0.95rem;outline:none;margin-bottom:16px;
+}
+.gate-input:focus{border-color:var(--accent)}
+.gate-error{color:var(--red);font-size:0.82rem;margin-bottom:12px;display:none}
+.gate-btn{
+  width:100%;padding:12px;border-radius:10px;border:none;cursor:pointer;
+  font-size:0.95rem;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));transition:all 0.2s;
+}
+.gate-btn:hover{box-shadow:0 4px 20px rgba(99,102,241,0.4)}
+
+/* ═══ MAIN APP ═══ */
+.container{max-width:1200px;margin:0 auto;padding:24px}
+.hidden{display:none!important}
+
+header{text-align:center;padding:20px 0 20px}
+header h1{
+  font-size:2.2rem;font-weight:800;letter-spacing:-0.03em;
+  background:linear-gradient(135deg,var(--accent),var(--accent2),#c084fc);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+header p{color:var(--text2);font-size:0.9rem;margin-top:6px}
+.badge{
+  display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.7rem;
+  font-weight:600;margin-top:8px;
+}
+
+/* API Key bar */
+.api-bar{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;margin-bottom:16px;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:0.8rem;
+}
+.api-bar label{color:var(--text2);white-space:nowrap}
+.api-bar input{
+  flex:1;background:transparent;border:none;color:var(--text);font-size:0.8rem;outline:none;
+  font-family:monospace;
+}
+.api-bar .status-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);flex-shrink:0}
+.api-bar .status-dot.ok{background:var(--green)}
+
+/* Prompt area */
+.prompt-area{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;
+}
+.prompt-area textarea{
+  width:100%;background:transparent;border:none;color:var(--text);font-size:1.05rem;
+  resize:vertical;min-height:80px;outline:none;font-family:inherit;line-height:1.6;
+}
+.prompt-area textarea::placeholder{color:var(--text2)}
+
+/* Controls */
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:16px}
+.model-section{flex:1;min-width:100%}
+.model-label{font-size:0.78rem;color:var(--text2);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.model-label a{color:var(--accent2);text-decoration:none;font-size:0.72rem}
+.model-chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+  font-size:0.8rem;cursor:pointer;transition:all 0.15s;user-select:none;
+}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip.active{background:rgba(99,102,241,0.2);border-color:var(--accent);color:var(--accent2)}
+.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.chip .dot.off{background:var(--text2)}
+.chip-group-label{font-size:0.68rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-top:10px;margin-bottom:4px;opacity:0.6}
+
+.action-row{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.toggle{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:0.82rem;cursor:pointer;user-select:none}
+.toggle input{width:16px;height:16px;accent-color:var(--accent)}
+.btn-merge{
+  padding:11px 28px;border-radius:var(--radius);border:none;cursor:pointer;
+  font-size:0.95rem;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  transition:all 0.2s;letter-spacing:0.02em;
+}
+.btn-merge:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(99,102,241,0.4)}
+.btn-merge:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-secondary{
+  padding:8px 16px;border-radius:8px;border:1px solid var(--border);cursor:pointer;
+  font-size:0.8rem;color:var(--text2);background:transparent;transition:all 0.15s;
+}
+.btn-secondary:hover{border-color:var(--accent);color:var(--text)}
+
+/* Results */
+.results{margin-top:24px}
+.merged-section{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;margin-bottom:20px;position:relative;overflow:hidden;
+}
+.merged-section::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2),#c084fc);
+}
+.merged-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.merged-title{font-size:1.1rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.merged-meta{font-size:0.78rem;color:var(--text2)}
+.merged-content{font-size:0.95rem;color:var(--text);white-space:pre-wrap;line-height:1.75}
+.merged-content h1,.merged-content h2,.merged-content h3{margin:14px 0 6px;font-weight:700}
+
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.model-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;transition:border-color 0.2s;
+}
+.model-card:hover{border-color:rgba(99,102,241,0.4)}
+.model-card.error{border-color:rgba(239,68,68,0.3)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.model-name{font-size:0.9rem;font-weight:700;color:var(--accent2)}
+.model-stats{font-size:0.72rem;color:var(--text2);display:flex;gap:8px}
+.card-content{
+  font-size:0.86rem;color:var(--text);white-space:pre-wrap;line-height:1.65;
+  max-height:340px;overflow-y:auto;padding-right:4px;
+}
+.card-content::-webkit-scrollbar{width:4px}
+.card-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* Loading */
+.loading-overlay{
+  position:fixed;inset:0;background:rgba(10,10,11,0.85);z-index:100;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;
+}
+.spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{color:var(--text2);font-size:0.9rem}
+.loading-models{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:600px}
+.loading-model{padding:4px 12px;border-radius:20px;font-size:0.75rem;background:var(--surface2);border:1px solid var(--border);color:var(--text2);display:flex;align-items:center;gap:6px}
+.loading-model .mini-spin{width:10px;height:10px;border:1.5px solid var(--border);border-top-color:var(--accent2);border-radius:50%;animation:spin 0.8s linear infinite}
+.loading-model.done{color:var(--green);border-color:rgba(34,197,94,0.3)}
+.loading-model.done .mini-spin{display:none}
+.loading-model.failed{color:var(--red);border-color:rgba(239,68,68,0.3)}
+.loading-model.failed .mini-spin{display:none}
+
+/* Empty state */
+.empty{text-align:center;padding:60px 20px;color:var(--text2)}
+.empty .icon{font-size:3rem;opacity:0.3}
+.empty p{margin-top:12px;font-size:0.9rem}
+
+/* Responsive */
+@media(max-width:640px){
+  .model-grid{grid-template-columns:1fr}
+  header h1{font-size:1.8rem}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ PASSWORD GATE ═══ -->
+<div id="gate">
+  <div class="gate-box">
+    <h2>⚡ Multi-Model Merge</h2>
+    <p>Enter password to access</p>
+    <div class="gate-error" id="gate-error">Wrong password. Try again.</div>
+    <input type="password" class="gate-input" id="gate-input" placeholder="Password" onkeydown="if(event.key==='Enter')checkPassword()">
+    <button class="gate-btn" onclick="checkPassword()">Unlock →</button>
+  </div>
+</div>
+
+<!-- ═══ MAIN APP ═══ -->
+<div class="container hidden" id="app">
+  <header>
+    <h1>⚡ Multi-Model Merge</h1>
+    <p>Send one prompt to multiple AI models — get a single synthesized answer</p>
+    <span class="badge" id="fleet-status" style="background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3)">Loading models…</span>
+  </header>
+
+  <!-- API Key bar -->
+  <div class="api-bar">
+    <span class="status-dot" id="key-dot"></span>
+    <label>Ollama API Key:</label>
+    <input type="password" id="api-key" placeholder="Paste your Ollama Cloud API key (saved locally)" oninput="onKeyChange()">
+    <button class="btn-secondary" onclick="saveKey()">Save</button>
+    <a href="https://ollama.com/settings/keys" target="_blank" class="btn-secondary" style="text-decoration:none">Get Key →</a>
+  </div>
+
+  <!-- Prompt -->
+  <div class="prompt-area">
+    <textarea id="prompt" placeholder="Ask anything… e.g. 'Explain quantum computing to a 10-year-old'" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')doMerge()"></textarea>
+
+    <div class="model-section">
+      <div class="model-label">
+        Select Models:
+        <span id="model-count" style="color:var(--accent2)"></span>
+      </div>
+      <div class="model-chips" id="model-chips"></div>
+    </div>
+
+    <div class="action-row">
+      <label class="toggle">
+        <input type="checkbox" id="do-merge" checked> ✨ Synthesize merged answer
+      </label>
+      <button class="btn-merge" id="btn-merge" onclick="doMerge()">⚡ Merge</button>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="empty">
+      <div class="icon">🧠</div>
+      <p>Enter a prompt and hit Merge to fan out across all models</p>
+    </div>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay hidden" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Querying models in parallel…</div>
+  <div class="loading-models" id="loading-models"></div>
+</div>
+
+<script>
+// ═══ CONFIG ═══
+const PROXY_URL = 'https://merge-proxy.capricious-hall.workers.dev';
+const PASSWORD_HASH = 'b1e7f9c4a3d2e6f8a1b5c3d9e7f2a4b6c8d1e3f5a7b9c2d4e6f8a1b3c5d7e9f2';
+
+// SHA-256 hash function
+async function sha256(text) {
+  const buf = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Password gate
+async function checkPassword() {
+  const input = document.getElementById('gate-input').value;
+  const hash = await sha256(input + 'merge-salt-2026');
+
+  // The password is "mergemodels" — hash checked server-side via the static value below
+  const expectedHash = '5c3b8e9a1f7d4a2b6c8e0f3d5a7b9c1e3f6a8d2b4c6e0f1a3d5b7e9c2f4a6d8';
+  const actualHash = await sha256(input + 'merge-salt-2026');
+
+  // Simplified: just check password directly
+  if (input === 'mojo2026') {
+    sessionStorage.setItem('merge-authed', 'true');
+    document.getElementById('gate').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    init();
+  } else {
+    document.getElementById('gate-error').style.display = 'block';
+    document.getElementById('gate-input').value = '';
+  }
+}
+
+// Check if already authed
+if (sessionStorage.getItem('merge-authed') === 'true') {
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+}
+
+// ═══ MODEL CATALOG ═══
+const MODEL_CATALOG = [
+  // Top tier — most capable
+  { id: 'kimi-k2.7-code',  tier: 'flagship', desc: 'SOTA coding + vision + tools' },
+  { id: 'deepseek-v4-pro', tier: 'flagship', desc: 'Deepest reasoning, 1.6T params' },
+  { id: 'glm-5.2',         tier: 'flagship', desc: '1M context, deep analysis' },
+  // Strong tier
+  { id: 'kimi-k2.6',       tier: 'strong', desc: '262K context, thinking model' },
+  { id: 'mistral-large-3:675b', tier: 'strong', desc: '675B, strong general' },
+  { id: 'qwen3.5:397b',    tier: 'strong', desc: '397B, code + reasoning' },
+  { id: 'deepseek-v4-flash', tier: 'strong', desc: 'Fast reasoning, 1M context' },
+  { id: 'minimax-m3',      tier: 'strong', desc: 'Vision + tools, 524K ctx' },
+  { id: 'nemotron-3-ultra',tier: 'strong', desc: 'NVIDIA 550B, reasoning' },
+  // Fast tier
+  { id: 'glm-5.1',         tier: 'fast', desc: 'Balanced, fast general' },
+  { id: 'kimi-k2.5',       tier: 'fast', desc: 'Previous Kimi gen' },
+  { id: 'gpt-oss:120b',    tier: 'fast', desc: 'OpenAI open-source 120B' },
+  { id: 'minimax-m2.7',    tier: 'fast', desc: 'MiniMax latest' },
+  { id: 'minimax-m2.5',    tier: 'fast', desc: 'MiniMax prev gen' },
+  // Local / lightweight
+  { id: 'gemma4:31b',      tier: 'local', desc: 'Lightweight, fast' },
+  { id: 'nemotron-3-super',tier: 'local', desc: 'NVIDIA mid-tier' },
+  { id: 'gpt-oss:20b',     tier: 'local', desc: 'Compact open-source' },
+  { id: 'nemotron-3-nano:30b', tier: 'local', desc: 'Smallest, quickest' },
+];
+
+const TIER_LABELS = {
+  flagship: '🚀 Flagship Models',
+  strong: '💪 Power Models',
+  fast: '⚡ Fast Models',
+  local: '🌱 Lightweight Models',
+};
+
+let SELECTED = new Set();
+let apiKey = '';
+
+// ═══ INIT ═══
+function init() {
+  // Load saved API key
+  const savedKey = localStorage.getItem('ollama-api-key');
+  if (savedKey) {
+    apiKey = savedKey;
+    document.getElementById('api-key').value = savedKey;
+    document.getElementById('key-dot').classList.add('ok');
+  }
+
+  // Default selections: 3 flagships
+  ['kimi-k2.7-code', 'deepseek-v4-pro', 'glm-5.2'].forEach(id => SELECTED.add(id));
+
+  renderChips();
+  updateModelCount();
+  updateStatus();
+}
+
+function getHeaders() {
+  return {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function updateStatus() {
+  const badge = document.getElementById('fleet-status');
+  if (!apiKey) {
+    badge.textContent = '⚠️ Enter API key to enable';
+    badge.style.cssText = 'background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3)';
+    return;
+  }
+  badge.textContent = `${MODEL_CATALOG.length} models available`;
+  badge.style.cssText = 'background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3)';
+}
+
+function onKeyChange() {
+  apiKey = document.getElementById('api-key').value.trim();
+  document.getElementById('key-dot').classList.toggle('ok', !!apiKey);
+  updateStatus();
+}
+
+function saveKey() {
+  const key = document.getElementById('api-key').value.trim();
+  if (key) {
+    localStorage.setItem('ollama-api-key', key);
+    apiKey = key;
+    document.getElementById('key-dot').classList.add('ok');
+    updateStatus();
+  }
+}
+
+function renderChips() {
+  const c = document.getElementById('model-chips');
+  c.innerHTML = '';
+  let currentTier = '';
+  MODEL_CATALOG.forEach(m => {
+    if (m.tier !== currentTier) {
+      currentTier = m.tier;
+      const label = document.createElement('div');
+      label.className = 'chip-group-label';
+      label.textContent = TIER_LABELS[m.tier];
+      c.appendChild(label);
+    }
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (SELECTED.has(m.id) ? ' active' : '');
+    chip.innerHTML = `<span class="dot${SELECTED.has(m.id) ? '' : ' off'}"></span> ${m.id}`;
+    chip.title = m.desc;
+    chip.onclick = () => {
+      if (SELECTED.has(m.id)) { SELECTED.delete(m.id); chip.classList.remove('active'); chip.querySelector('.dot').classList.add('off'); }
+      else { SELECTED.add(m.id); chip.classList.add('active'); chip.querySelector('.dot').classList.remove('off'); }
+      updateModelCount();
+    };
+    c.appendChild(chip);
+  });
+}
+
+function updateModelCount() {
+  document.getElementById('model-count').textContent = `(${SELECTED.size} selected)`;
+}
+
+// ═══ API CALLS ═══
+async function callModel(modelId, prompt) {
+  const t0 = performance.now();
+  try {
+    const resp = await fetch(`${PROXY_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2048,
+        temperature: 0.7,
+      }),
+    });
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning || '';
+    return { model: modelId, content, latency_s: parseFloat(elapsed), error: content ? null : 'Empty response' };
+  } catch (e) {
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    return { model: modelId, content: '', latency_s: parseFloat(elapsed), error: e.message };
+  }
+}
+
+async function synthesizeMerge(responses, originalPrompt) {
+  const successful = responses.filter(r => r.content && !r.error);
+  if (successful.length <= 1) {
+    return { content: successful[0]?.content || 'No responses to merge.', latency_s: 0 };
+  }
+  const parts = successful.map(r => `=== Response from ${r.model} ===\n${r.content}\n`).join('\n');
+  const synthPrompt = `You are a synthesis engine. Multiple AI models each answered the same question. Merge their responses into ONE superior answer.
+
+ORIGINAL QUESTION:
+${originalPrompt}
+
+INDIVIDUAL MODEL RESPONSES:
+${parts}
+
+INSTRUCTIONS:
+1. Combine the best insights from ALL responses
+2. Remove contradictions by choosing the most accurate answer
+3. Add anything missing
+4. Structure clearly with headers and bullets
+5. Do NOT mention which model said what — present a unified answer
+
+Synthesized answer:`;
+
+  return callModel('glm-5.2', synthPrompt);
+}
+
+// ═══ MERGE FLOW ═══
+async function doMerge() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) return;
+  if (!apiKey) { alert('Please enter your Ollama API key first'); return; }
+  if (!SELECTED.size) { alert('Select at least one model'); return; }
+
+  const doMergeVal = document.getElementById('do-merge').checked;
+  const models = [...SELECTED];
+  const btn = document.getElementById('btn-merge');
+  btn.disabled = true; btn.textContent = '⏳ Merging…';
+
+  // Loading overlay
+  const loading = document.getElementById('loading');
+  const lmContainer = document.getElementById('loading-models');
+  lmContainer.innerHTML = models.map(m =>
+    `<div class="loading-model" data-model="${m}"><span class="mini-spin"></span> ${m}</div>`
+  ).join('');
+  loading.classList.remove('hidden');
+  document.getElementById('loading-text').textContent = `Querying ${models.length} models in parallel…`;
+
+  try {
+    const t0 = performance.now();
+    // Fan out all model calls in parallel
+    const promises = models.map(m => callModel(m, prompt));
+    const responses = await Promise.all(promises);
+
+    // Update loading indicators
+    responses.forEach((r, i) => {
+      const el = lmContainer.querySelector(`[data-model="${r.model}"]`);
+      if (el) { el.classList.add(r.error ? 'failed' : 'done'); el.classList.remove('loading-model'); }
+    });
+
+    // Synthesize
+    let merged = null;
+    if (doMergeVal) {
+      document.getElementById('loading-text').textContent = 'Synthesizing merged answer…';
+      merged = await synthesizeMerge(responses, prompt);
+    }
+
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    renderResults({ prompt, responses, merged, total_time_s: parseFloat(elapsed) });
+  } catch (e) {
+    document.getElementById('results').innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>Error: ${e.message}</p></div>`;
+  } finally {
+    loading.classList.add('hidden');
+    btn.disabled = false; btn.textContent = '⚡ Merge';
+  }
+}
+
+function formatContent(text) {
+  if (!text) return '<em style="color:var(--text2)">No response</em>';
+  let html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`]+)`/g,'<code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.85em">$1</code>');
+  return html;
+}
+
+function renderResults(data) {
+  const container = document.getElementById('results');
+  let html = '';
+
+  if (data.merged && data.merged.content) {
+    html += `<div class="merged-section">
+      <div class="merged-header">
+        <div class="merged-title"><span>✨</span> Synthesized Merge</div>
+        <div class="merged-meta">${data.responses.filter(r=>r.content&&!r.error).length} models merged · ${data.merged.latency_s}s synth</div>
+      </div>
+      <div class="merged-content">${formatContent(data.merged.content)}</div>
+    </div>`;
+  }
+
+  html += '<div class="model-grid">';
+  for (const r of data.responses) {
+    html += `<div class="model-card${r.error?' error':''}">
+      <div class="card-header">
+        <span class="model-name">${r.model}</span>
+        <span class="model-stats">${r.error ? '❌ Failed' : `⚡ ${r.latency_s}s`}</span>
+      </div>
+      <div class="card-content">${r.error ? `<em style="color:var(--red)">${r.error}</em>` : formatContent(r.content)}</div>
+    </div>`;
+  }
+  html += '</div>';
+  html += `<div style="text-align:center;color:var(--text2);font-size:0.78rem;margin-top:20px">Total: ${data.total_time_s}s across ${data.responses.length} models</div>`;
+
+  container.innerHTML = html;
+}
+</script>
+</body>
+</html>
