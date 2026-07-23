@@ -307,16 +307,21 @@ const TIER_LABELS = {
 };
 
 let SELECTED = new Set();
-let apiKey = '';
+let apiKey = 'a3b77dbf0ff04411a0aabda8919f99d6.tqqgaTok_UH1PWDc66rmJ5bG';
 
 // ═══ INIT ═══
 function init() {
-  // Load saved API key
-  const savedKey = localStorage.getItem('ollama-api-key');
-  if (savedKey) {
-    apiKey = savedKey;
-    document.getElementById('api-key').value = savedKey;
+  // Pre-fill API key field since it's baked in
+  if (apiKey) {
+    document.getElementById('api-key').value = '•••••••••••••••••••••••••••••••••';
     document.getElementById('key-dot').classList.add('ok');
+  } else {
+    const savedKey = localStorage.getItem('ollama-api-key');
+    if (savedKey) {
+      apiKey = savedKey;
+      document.getElementById('api-key').value = savedKey;
+      document.getElementById('key-dot').classList.add('ok');
+    }
   }
 
   // Default selections: 3 flagships
